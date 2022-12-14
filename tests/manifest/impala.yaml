@@ -1,0 +1,151 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: impala-master-svc
+  namespace: hive
+  labels:
+    app: impala-master
+spec:
+  ports:
+  - name: be-port
+    port: 22000
+    targetPort: 22000
+    protocol: TCP
+  - name: impalad-store
+    port: 23000
+    targetPort: 23000
+    protocol: TCP
+  - name: catalogd-store
+    port: 23020
+    targetPort: 23020
+    protocol: TCP
+  - name: state-store
+    port: 24000
+    targetPort: 24000
+    protocol: TCP
+  - name: catalog-service
+    port: 26000
+    targetPort: 26000
+    protocol: TCP
+  selector:
+    app: impala-master
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: impala-worker-svc
+  namespace: hive
+  labels:
+    app: impala-worker
+spec:
+  ports:
+  - name: be-port
+    port: 22000
+    targetPort: 22000
+    protocol: TCP
+  - name: impalad-store
+    port: 23000
+    targetPort: 23000
+    protocol: TCP
+  selector:
+    app: impala-worker
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: impala-master
+  namespace: hive
+spec:
+  selector:
+    matchLabels:
+      app: impala-master
+  serviceName: impala-master-svc
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: impala-master
+        name: impala-master
+    spec:
+      containers:      
+        - name: impala
+          image: kubernetesbigdataeg/impala:4.1.0-1
+          imagePullPolicy: IfNotPresent
+          args: [master]
+          ports:
+          - name: be-port
+            containerPort: 22000
+            protocol: TCP
+          - name: impalad-store
+            containerPort: 23000
+            protocol: TCP
+          - name: catalogd-store
+            containerPort: 23020
+            protocol: TCP
+          - name: state-store
+            containerPort: 24000
+            protocol: TCP
+          - name: catalog-service
+            containerPort: 26000
+            protocol: TCP
+          volumeMounts:
+            - name: impala-logs
+              mountPath: /var/log/impala/
+      volumes:
+        - name: impala-logs
+          hostPath:
+            path: /var/log/impala/
+  volumeClaimTemplates:
+    - metadata:
+        name: impala-logs
+      spec:
+        accessModes: 
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: "1Gi"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: impala-worker
+  namespace: hive
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: impala-worker
+  serviceName: impala-worker-svc
+  template:
+    metadata:
+      labels:
+        app: impala-worker
+    spec:
+      containers:      
+        - name: impala
+          image: kubernetesbigdataeg/impala:4.1.0-1
+          imagePullPolicy: Always
+          args: [worker]
+          ports:
+          - name: be-port
+            containerPort: 22000
+            protocol: TCP
+          - name: impalad-store
+            containerPort: 23000
+            protocol: TCP
+          volumeMounts:
+            - name: impala-logs
+              mountPath: /var/log/impala/
+      volumes:
+        - name: impala-logs
+          hostPath:
+            path: /var/log/impala/
+  volumeClaimTemplates:
+    - metadata:
+        name: impala-logs
+      spec:
+        accessModes: 
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: "1Gi"

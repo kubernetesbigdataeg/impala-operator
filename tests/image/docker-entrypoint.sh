@@ -1,0 +1,202 @@
+#!/bin/bash
+
+sh impala-config.sh
+
+export IMPALA_HOME=/opt/impala
+export HADOOP_HOME=/opt/hadoop
+export HIVE_HOME=/opt/hive
+export HIVE_CONF=/opt/hive/conf
+
+# Add directories containing dynamic libraries required by the daemons that
+# are not on the system library paths.
+export LD_LIBRARY_PATH=/opt/impala/lib
+
+# This can get more detailed if there are specific steps
+# for specific versions, but at the moment the distribution
+# is all we need.
+DISTRIBUTION=Unknown
+if [[ -f /etc/redhat-release ]]; then
+  echo "Identified Redhat image."
+  DISTRIBUTION=Redhat
+else
+  source /etc/lsb-release
+  if [[ $DISTRIB_ID == Ubuntu ]]; then
+    echo "Identified Ubuntu image."
+    DISTRIBUTION=Ubuntu
+  fi
+fi
+
+if [[ $DISTRIBUTION == Unknown ]]; then
+  echo "ERROR: Did not detect supported distribution."
+  echo "Only Ubuntu and Redhat-based distributions are supported."
+  exit 1
+fi
+
+# Need libjvm.so and libjsig.so on LD_LIBRARY_PATH
+# Ubuntu and Redhat use different locations for JAVA_HOME.
+# This detection logic handles both Java 8 and Java 11.
+# If both are present (which shouldn't happen), Java 11 is preferred.
+JAVA_HOME=Unknown
+USING_JAVA11=false
+if [[ $DISTRIBUTION == Ubuntu ]]; then
+  # Since the Java location includes the CPU architecture, use a glob
+  # to find Java home
+  if compgen -G "/usr/lib/jvm/java-11-openjdk*" ; then
+    JAVA_HOME=$(compgen -G "/usr/lib/jvm/java-11-openjdk*")
+    USING_JAVA11=true
+    if compgen -G "/usr/lib/jvm/java-8-openjdk*" ; then
+      echo "WARNING: Java 8 is also present"
+    fi
+  elif compgen -G "/usr/lib/jvm/java-8-openjdk*" ; then
+    echo "Detected Java 8"
+    JAVA_HOME=$(compgen -G "/usr/lib/jvm/java-8-openjdk*")
+  fi
+elif [[ $DISTRIBUTION == Redhat ]]; then
+  if [[ -d /usr/lib/jvm/jre-11 ]]; then
+    echo "Detected Java 11"
+    JAVA_HOME=/usr/lib/jvm/jre-11
+    USING_JAVA11=true
+    if [[ -d /usr/lib/jvm/jre-1.8.0 ]]; then
+      echo "WARNING: Java 8 is also present"
+    fi
+  elif [[ -d /usr/lib/jvm/jre-1.8.0 ]]; then
+    echo "Detected Java 8"
+    JAVA_HOME=/usr/lib/jvm/jre-1.8.0
+  fi
+fi
+
+if [[ $JAVA_HOME == Unknown ]]; then
+  echo "ERROR: Did not find Java in any expected location."
+  echo "Only Java 8 and Java 11 are supported."
+  exit 1
+fi
+
+echo "JAVA_HOME: ${JAVA_HOME}"
+# Given JAVA_HOME, find libjsig.so and libjvm.so and add them to LD_LIBRARY_PATH.
+# JAVA_HOME could be a symlink, so follow symlinks when looking for the libraries
+LIB_JSIG_DIR=$(find -L "${JAVA_HOME}" -name libjsig.so | head -1 | xargs dirname)
+if [[ -z $LIB_JSIG_DIR ]]; then
+  echo "ERROR: Could not find libjsig.so in ${JAVA_HOME}"
+  exit 1
+fi
+LIB_JVM_DIR=$(find -L "${JAVA_HOME}" -name libjvm.so |head -1 | xargs dirname)
+if [[ -z $LIB_JVM_DIR ]]; then
+  echo "ERROR: Could not find libjvm.so in ${JAVA_HOME}"
+  exit 1
+fi
+LD_LIBRARY_PATH+=:${LIB_JSIG_DIR}:${LIB_JVM_DIR}
+
+# Add directory with optional plugins that can be mounted for the container.
+LD_LIBRARY_PATH+=:/opt/impala/lib/plugins
+LD_LIBRARY_PATH+=:/opt/impala/lib64
+
+# Configs should be first on classpath
+export CLASSPATH=/opt/impala/conf 
+# Append all of the jars in /opt/impala/lib to the classpath.
+for jar in /opt/impala/lib/*.jar
+do
+  CLASSPATH+=:$jar
+done
+# Append all of the jars in /opt/hive/lib to the classpath.
+for jar in /opt/hive/lib/*.jar
+do
+  CLASSPATH+=:$jar
+done
+echo "CLASSPATH: $CLASSPATH"
+echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
+
+# IMPALA-11260: ehcache underestimates sizes on Java 9+ due to restrictions
+# on reflection. As a workaround, this turns off the restrictions to allow
+# ehcache to function. The real fix needs to happen on the ehcache side.
+if $USING_JAVA11 ; then
+  JAVA11_OPTIONS=" --add-opens=java.base/java.io=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/java.lang.module=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/java.lang.ref=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/java.lang=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/java.net=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/java.nio.charset=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/java.nio.file.attribute=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/java.nio=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/java.security=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/java.util.concurrent=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/java.util.jar=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/java.util.zip=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/java.util=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/jdk.internal.loader=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/jdk.internal.math=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/jdk.internal.module=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/jdk.internal.reflect=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/jdk.internal.util.jar=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=java.base/sun.nio.fs=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.beans=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.linker.support=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.linker=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink.support=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=jdk.dynalink/jdk.dynalink=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=jdk.management.jfr/jdk.management.jfr=ALL-UNNAMED"
+  JAVA11_OPTIONS+=" --add-opens=jdk.management/com.sun.management.internal=ALL-UNNAMED"
+  JAVA_TOOL_OPTIONS="$JAVA11_OPTIONS $JAVA_TOOL_OPTIONS"
+fi
+
+# Default to 2GB heap. Allow overriding by externally-set JAVA_TOOL_OPTIONS.
+export JAVA_TOOL_OPTIONS="-Xmx2g $JAVA_TOOL_OPTIONS"
+
+echo "JAVA_TOOL_OPTIONS: $JAVA_TOOL_OPTIONS"
+
+# Various Hadoop libraries depend on having a username. If we're running under
+# an unknown username, create an entry in the password file for this user.
+if ! whoami ; then
+  export USER=${HADOOP_USER_NAME:-dummyuser}
+  echo "${USER}:x:$(id -u):$(id -g):,,,:/opt/impala:/bin/bash" >> /etc/passwd
+  whoami
+  cat /etc/passwd$IMPALA_HOME/log
+fi
+
+# IMPALA-10006: avoid cryptic failures if log dir isn't writable.
+LOG_DIR=/var/log/impala
+if [[ ! -w "$LOG_DIR" ]]; then
+  echo "$LOG_DIR is not writable"
+  exit 1
+fi
+
+# Set ulimit core file size 0.
+ulimit -c 0
+
+# The UTF-8 masking functions rely on the presence of en_US.utf8. Make sure
+# it is present.
+if locale -a | grep en_US.utf8 ; then
+  echo "en_US.utf8 is present"
+else
+  echo "ERROR: en_US.utf8 locale is not present."
+  exit 1
+fi
+
+# Set a UTF-8 locale to enable upper/lower/initcap functions with UTF-8 mode.
+# Use C.UTF-8 (aka C.utf8) if it is available, and fall back to en_US.utf8 if not
+#
+# Distributions can show either C.UTF-8 or C.utf8 in "locale -a", match either one
+if locale -a | grep -e "^C.UTF-8" -e "^C.utf8" ; then
+  # C.UTF-8 and C.utf8 are interchangeable as a setting for LC_ALL.
+  export LC_ALL=C.UTF-8
+else
+  # Presence of en_US.utf8 was verified above
+  export LC_ALL=en_US.utf8
+fi
+echo "LC_ALL: ${LC_ALL}"
+
+#echo "args: $@"
+
+if [[ "$1" = 'master' ]]; then
+
+  exec "/opt/impala/sbin/impalad" "--flagfile=/opt/impala/conf/impala.gflagfile" &
+  exec "/opt/impala/sbin/statestored" "--flagfile=/opt/impala/conf/statestore.gflagfile" &
+  exec "/opt/impala/sbin/catalogd" "--flagfile=/opt/impala/conf/catalog.gflagfile" &
+  exec "/opt/impala/sbin/admissiond" "--flagfile=/opt/impala/conf/admission.gflagfile"
+
+elif [[ "$1" = 'worker' ]]; then
+
+  exec "/opt/impala/sbin/impalad" "--flagfile=/opt/impala/conf/impala.gflagfile"
+
+fi
