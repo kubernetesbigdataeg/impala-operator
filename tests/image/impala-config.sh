@@ -11,27 +11,27 @@ sudo chown impala: /opt/impala/conf/impala.env
 cat << EOF | sudo tee /opt/impala/conf/impala.gflagfile
 --abort_on_config_error=false
 --log_dir=/var/log/impala
---state_store_host=impala-master-0.impala-master-svc.hive.svc.cluster.local
---catalog_service_host=impala-master-0.impala-master-svc.hive.svc.cluster.local
---admission_service_host=impala-master-0.impala-master-svc.hive.svc.cluster.local
---kudu_master_hosts=kudu-masters.apache-kudu.svc.cluster.local
+--state_store_host=impala-master-0.impala-master-svc.kudu.svc.cluster.local
+--catalog_service_host=impala-master-0.impala-master-svc.kudu.svc.cluster.local
+--admission_service_host=impala-master-0.impala-master-svc.kudu.svc.cluster.local
+--kudu_master_hosts=kudu-master-0.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-1.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-2.kudu-masters.kudu.svc.cluster.local:7051
 --enable_legacy_avx_support=true
 EOF
 sudo chown impala: /opt/impala/conf/impala.gflagfile
 cat << EOF | sudo tee /opt/impala/conf/catalog.gflagfile
---kudu_master_hosts=kudu-masters.apache-kudu.svc.cluster.local
+--kudu_master_hosts=kudu-master-0.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-1.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-2.kudu-masters.kudu.svc.cluster.local:7051
 --log_dir=/var/log/impala
 --enable_legacy_avx_support=true
 EOF
 sudo chown impala: /opt/impala/conf/catalog.gflagfile
 cat << EOF | sudo tee /opt/impala/conf/statestore.gflagfile
---kudu_master_hosts=kudu-masters.apache-kudu.svc.cluster.local
+--kudu_master_hosts=kudu-master-0.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-1.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-2.kudu-masters.kudu.svc.cluster.local:7051
 --log_dir=/var/log/impala
 --enable_legacy_avx_support=true
 EOF
 sudo chown impala: /opt/impala/conf/statestore.gflagfile
 cat << EOF | sudo tee /opt/impala/conf/admission.gflagfile
---kudu_master_hosts=kudu-masters.apache-kudu.svc.cluster.local
+--kudu_master_hosts=kudu-master-0.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-1.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-2.kudu-masters.kudu.svc.cluster.local:7051
 --log_dir=/var/log/impala
 --enable_legacy_avx_support=true
 EOF
@@ -44,7 +44,7 @@ cat << EOF | sudo tee /opt/hive/conf/hive-site.xml
   </property>
   <property>
       <name>hive.metastore.uris</name>
-      <value>thrift://hive-metastore-svc.hive.svc.cluster.local:9083</value>
+      <value>thrift://hive-metastore-svc.kudu.svc.cluster.local:9083</value>
   </property>
   <property>
       <name>hive.metastore.warehouse.dir</name>
@@ -60,7 +60,7 @@ cat << EOF | sudo tee /opt/hive/conf/hive-site.xml
   </property>
   <property>
       <name>javax.jdo.option.ConnectionURL</name>
-      <value>jdbc:postgresql://postgresql-svc.hive.svc.cluster.local:5432/metastore</value>
+      <value>jdbc:postgresql://postgresql-svc.kudu.svc.cluster.local:5432/metastore</value>
   </property>
   <property>
       <name>javax.jdo.option.ConnectionUserName</name>
