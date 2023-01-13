@@ -103,8 +103,10 @@ spec:
             containerPort: 25000
             protocol: TCP
           volumeMounts:
-            - name: impala-logs
-              mountPath: /var/log/impala/
+          - name: impala-logs
+            mountPath: /var/log/impala/
+          - name: impala-env
+            mountPath: /etc/environments
         - name: logs-impalad
           image: busybox:1.28
           args: [/bin/sh, -c, 'tail -n+1 -F /var/log/impala/impalad.INFO']
@@ -132,6 +134,9 @@ spec:
       volumes:
         - name: impala-logs
           emptyDir: {}
+        - configMap:
+            name: impala-config
+          name: impala-env
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -162,8 +167,10 @@ spec:
             containerPort: 23000
             protocol: TCP
           volumeMounts:
-            - name: impala-logs
-              mountPath: /var/log/impala/
+          - name: impala-logs
+            mountPath: /var/log/impala/
+          - name: impala-env
+            mountPath: /etc/environments
         - name: logs-impalad
           image: busybox:1.28
           args: [/bin/sh, -c, 'tail -n+1 -F /var/log/impala/impalad.INFO']
@@ -173,3 +180,64 @@ spec:
       volumes:
         - name: impala-logs
           emptyDir: {}
+        - configMap:
+            name: impala-config
+          name: impala-env
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: impala-config
+  namespace: kudu
+data:
+  impala.env: |
+    export IMPALA__impaladaemon__abort_on_config_error=false
+    export IMPALA__impaladaemon__log_dir=/var/log/impala
+    export IMPALA__impaladaemon__state_store_host=impala-master-0.impala-master-svc.kudu.svc.cluster.local
+    export IMPALA__impaladaemon__catalog_service_host=impala-master-0.impala-master-svc.kudu.svc.cluster.local
+    export IMPALA__impaladaemon__admission_service_host=impala-master-0.impala-master-svc.kudu.svc.cluster.local
+    export IMPALA__impaladaemon__kudu_master_hosts=kudu-master-0.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-1.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-2.kudu-masters.kudu.svc.cluster.local:7051
+    export IMPALA__impaladaemon__enable_legacy_avx_support=true
+    export IMPALA__impalacatalog__kudu_master_hosts=kudu-master-0.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-1.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-2.kudu-masters.kudu.svc.cluster.local:7051
+    export IMPALA__impalacatalog__log_dir=/var/log/impala
+    export IMPALA__impalacatalog__enable_legacy_avx_support=true
+    export IMPALA__impalacatalog__hms_event_incremental_refresh_transactional_table=false
+    export IMPALA__impalastatestore__kudu_master_hosts=kudu-master-0.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-1.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-2.kudu-masters.kudu.svc.cluster.local:7051
+    export IMPALA__impalastatestore__log_dir=/var/log/impala
+    export IMPALA__impalastatestore__enable_legacy_avx_support=true
+    export IMPALA__impalaadmission__kudu_master_hosts=kudu-master-0.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-1.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-2.kudu-masters.kudu.svc.cluster.local:7051
+    export IMPALA__impalaadmission__log_dir=/var/log/impala
+    export IMPALA__impalaadmission__enable_legacy_avx_support=true
+    export IMPALA__hivesite__javax_jdo_option_ConnectionURL="jdbc:postgresql://postgresql-svc.kudu.svc.cluster.local:5432/metastore"
+    export IMPALA__hivesite__javax_jdo_option_ConnectionDriverName="org.postgresql.Driver"
+    export IMPALA__hivesite__javax_jdo_option_ConnectionUserName="postgres"
+    export IMPALA__hivesite__javax_jdo_option_ConnectionPassword="postgres"
+    export IMPALA__hivesite__metastore_expression_proxy="org.apache.hadoop.hive.metastore.DefaultPartitionExpressionProxy"
+    export IMPALA__hivesite__metastore_task_threads_always="org.apache.hadoop.hive.metastore.events.EventCleanerTask,org.apache.hadoop.hive.metastore.MaterializationsCacheCleanerTask"
+    export IMPALA__hivesite__datanucleus_autoCreateSchema="false"
+    export IMPALA__hivesite__hive_metastore_uris="thrift://hive-metastore-svc.kudu.svc.cluster.local:9083"
+    export IMPALA__hivesite__hive_metastore_warehouse_dir="/var/lib/hive/warehouse"
+    export IMPALA__hivesite__hive_metastore_transactional_event_listeners="org.apache.hive.hcatalog.listener.DbNotificationListener,org.apache.kudu.hive.metastore.KuduMetastorePlugin"
+    export IMPALA__hivesite__hive_metastore_disallow_incompatible_col_type_changes="false"
+    export IMPALA__hivesite__hive_metastore_dml_events="true"
+    export IMPALA__hivesite__hive_metastore_event_db_notification_api_auth="false"
+    export IMPALA__coresite__fs_defaultFS="hdfs://hdfs-k8s"
+    export IMPALA__coresite__ha_zookeeper_quorum="zk-0.zk-hs.default.svc.cluster.local:2181,zk-1.zk-hs.default.svc.cluster.local:2181,zk-2.zk-hs.default.svc.cluster.local:2181"
+    export IMPALA__hdfssite__dfs_nameservices="hdfs-k8s"
+    export IMPALA__hdfssite__dfs_ha_namenodes_hdfs___k8s="nn0,nn1"
+    export IMPALA__hdfssite__dfs_namenode_rpc___address_hdfs___k8s_nn0="hdfs-namenode-0.hdfs-namenode-svc.default.svc.cluster.local:8020"
+    export IMPALA__hdfssite__dfs_namenode_rpc___address_hdfs___k8s_nn1="hdfs-namenode-1.hdfs-namenode-svc.default.svc.cluster.local:8020"
+    export IMPALA__hdfssite__dfs_namenode_http___address_hdfs___k8s_nn0="hdfs-namenode-0.hdfs-namenode-svc.default.svc.cluster.local:50070"
+    export IMPALA__hdfssite__dfs_namenode_http___address_hdfs___k8s_nn1="hdfs-namenode-1.hdfs-namenode-svc.default.svc.cluster.local:50070"
+    export IMPALA__hdfssite__dfs_namenode_shared_edits_dir="qjournal://hdfs-journalnode-0.hdfs-journalnode-svc.default.svc.cluster.local:8485;hdfs-journalnode-1.hdfs-journalnode-svc.default.svc.cluster.local:8485;hdfs-journalnode-2.hdfs-journalnode-svc.default.svc.cluster.local:8485/hdfs-k8s"
+    export IMPALA__hdfssite__dfs_ha_automatic___failover_enabled="true"
+    export IMPALA__hdfssite__dfs_ha_fencing_methods="shell(/bin/true)"
+    export IMPALA__hdfssite__dfs_journalnode_edits_dir="/hadoop/dfs/journal"
+    export IMPALA__hdfssite__dfs_client_failover_proxy_provider_hdfs___k8s="org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider"
+    export IMPALA__hdfssite__dfs_namenode_name_dir="file:///hadoop/dfs/name"
+    export IMPALA__hdfssite__dfs_namenode_datanode_registration_ip___hostname___check="false"
+    export IMPALA__hdfssite__dfs_datanode_data_dir="/hadoop/dfs/data"
+    export IMPALA__hdfssite__dfs_client_read_shortcircuit="true"
+    export IMPALA__hdfssite__dfs_domain_socket_path="/var/run/hdfs-sockets/dn"
+    export IMPALA__hdfssite__dfs_client_file___block___storage___locations_timeout_millis="10000"
+    export IMPALA__hdfssite__dfs_datanode_hdfs___blocks___metadata_enabled="true"
