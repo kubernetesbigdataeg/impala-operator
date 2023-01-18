@@ -1,15 +1,4 @@
 #!/bin/bash
-cat << EOF | sudo tee /opt/impala/conf/impala.env
-export IMPALA_HOME=/opt/impala
-export JAVA_HOME=/usr/lib/jvm/java/
-export CLASSPATH=/opt/impala/lib/*:/opt/hive/lib/*
-export HADOOP_HOME=/opt/hadoop
-export HIVE_HOME=/opt/hive
-export METASTORE_HOME=/opt/hive
-export HIVE_CONF=/opt/hive/conf
-EOF
-sudo chown impala: /opt/impala/conf/impala.env
-source /opt/impala/conf/impala.env
 source /etc/environments/impala.env
 ./propgen -label IMPALA -render impaladaemon -file /opt/impala/conf/impala.gflagfile
 sudo chown impala: /opt/impala/conf/impala.gflagfile

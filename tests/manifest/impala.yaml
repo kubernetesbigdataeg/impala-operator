@@ -31,12 +31,25 @@ spec:
     port: 21000
     targetPort: 21000
     protocol: TCP
-  - name: impalad-ui
-    port: 25000
-    targetPort: 25000
-    protocol: TCP
   selector:
     app: impala-master
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: impalad-ui-svc
+  namespace: kudu
+  labels:
+    app: impala-master
+spec:
+  type: NodePort
+  ports:
+  - name: impalad-ui
+    port: 25000
+    nodePort: 30015
+    protocol: TCP
+  selector:
+    app: impala-master    
 ---
 apiVersion: v1
 kind: Service
@@ -54,6 +67,10 @@ spec:
   - name: impalad-store
     port: 23000
     targetPort: 23000
+    protocol: TCP
+  - name: beewax-service
+    port: 21000
+    targetPort: 21000
     protocol: TCP
   selector:
     app: impala-worker
@@ -78,8 +95,21 @@ spec:
       containers:      
         - name: impala
           image: kubernetesbigdataeg/impala:4.1.0-1
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args: [master]
+          env:
+          - name: IMPALA_HOME
+            value: /opt/impala
+          - name: JAVA_HOME
+            value: /usr/lib/jvm/java/
+          - name: CLASSPATH
+            value: /opt/impala/lib/*:/opt/hive/lib/*
+          - name: HADOOP_HOME
+            value: /opt/hadoop
+          - name: HIVE_HOME
+            value: /opt/hive
+          - name: HIVE_CONF_DIR
+            value: /opt/hive/conf
           ports:
           - name: be-port
             containerPort: 22000
@@ -157,14 +187,30 @@ spec:
       containers:      
         - name: impala
           image: kubernetesbigdataeg/impala:4.1.0-1
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args: [worker]
+          env:
+          - name: IMPALA_HOME
+            value: /opt/impala
+          - name: JAVA_HOME
+            value: /usr/lib/jvm/java/
+          - name: CLASSPATH
+            value: /opt/impala/lib/*:/opt/hive/lib/*
+          - name: HADOOP_HOME
+            value: /opt/hadoop
+          - name: HIVE_HOME
+            value: /opt/hive
+          - name: HIVE_CONF_DIR
+            value: /opt/hive/conf
           ports:
           - name: be-port
             containerPort: 22000
             protocol: TCP
           - name: impalad-store
             containerPort: 23000
+            protocol: TCP
+          - name: beewax-service
+            containerPort: 21000
             protocol: TCP
           volumeMounts:
           - name: impala-logs
@@ -201,7 +247,6 @@ data:
     export IMPALA__impalacatalog__kudu_master_hosts=kudu-master-0.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-1.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-2.kudu-masters.kudu.svc.cluster.local:7051
     export IMPALA__impalacatalog__log_dir=/var/log/impala
     export IMPALA__impalacatalog__enable_legacy_avx_support=true
-    export IMPALA__impalacatalog__hms_event_incremental_refresh_transactional_table=false
     export IMPALA__impalastatestore__kudu_master_hosts=kudu-master-0.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-1.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-2.kudu-masters.kudu.svc.cluster.local:7051
     export IMPALA__impalastatestore__log_dir=/var/log/impala
     export IMPALA__impalastatestore__enable_legacy_avx_support=true
@@ -215,7 +260,7 @@ data:
     export IMPALA__hivesite__metastore_expression_proxy="org.apache.hadoop.hive.metastore.DefaultPartitionExpressionProxy"
     export IMPALA__hivesite__metastore_task_threads_always="org.apache.hadoop.hive.metastore.events.EventCleanerTask,org.apache.hadoop.hive.metastore.MaterializationsCacheCleanerTask"
     export IMPALA__hivesite__datanucleus_autoCreateSchema="false"
-    export IMPALA__hivesite__hive_metastore_uris="thrift://hive-metastore-svc.kudu.svc.cluster.local:9083"
+    export IMPALA__hivesite__hive_metastore_uris="thrift://hive-svc.kudu.svc.cluster.local:9083"
     export IMPALA__hivesite__hive_metastore_warehouse_dir="/var/lib/hive/warehouse"
     export IMPALA__hivesite__hive_metastore_transactional_event_listeners="org.apache.hive.hcatalog.listener.DbNotificationListener,org.apache.kudu.hive.metastore.KuduMetastorePlugin"
     export IMPALA__hivesite__hive_metastore_disallow_incompatible_col_type_changes="false"
