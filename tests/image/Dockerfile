@@ -21,16 +21,12 @@ RUN sudo echo '/opt/impala/lib64' | tee /etc/ld.so.conf.d/impala.conf
 
 COPY docker-entrypoint.sh impala-config.sh /
 
-#RUN curl -s https://jdbc.postgresql.org/download/postgresql-42.2.16.jar -o postgresql-42.2.16.jar && mv postgresql-42.2.16.jar /opt/hive/lib/postgresql-jdbc.jar
+#COPY hms-plugin.jar /opt/hive/lib
 
-#RUN sudo adduser -r hive
-#RUN sudo chown -R hive: /opt/hive/
-#COPY hms-plugin.jar /opt/hive/lib/
-#RUN sudo chown hive: /opt/hive/lib/hms-plugin.jar
+RUN yum install -y wget && \
+  wget https://github.com/kubernetesbigdataeg/propgen/releases/latest/download/propgen
 
-RUN sudo chmod 777 docker-entrypoint.sh impala-config.sh
-
-#USER impala
+RUN sudo chmod 777 docker-entrypoint.sh impala-config.sh propgen
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 EXPOSE 8050 25010 25020 25030

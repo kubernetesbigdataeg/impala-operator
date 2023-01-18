@@ -3,9 +3,6 @@
 sh impala-config.sh
 
 export IMPALA_HOME=/opt/impala
-export HADOOP_HOME=/opt/hadoop
-export HIVE_HOME=/opt/hive
-export HIVE_CONF=/opt/hive/conf
 
 # Add directories containing dynamic libraries required by the daemons that
 # are not on the system library paths.
