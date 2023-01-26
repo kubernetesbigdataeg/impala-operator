@@ -244,6 +244,7 @@ data:
     export IMPALA__impaladaemon__admission_service_host=impala-master-0.impala-master-svc.kudu.svc.cluster.local
     export IMPALA__impaladaemon__kudu_master_hosts=kudu-master-0.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-1.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-2.kudu-masters.kudu.svc.cluster.local:7051
     export IMPALA__impaladaemon__enable_legacy_avx_support=true
+    export IMPALA__impaladaemon__statestore_subscriber_use_resolved_address=true
     export IMPALA__impalacatalog__kudu_master_hosts=kudu-master-0.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-1.kudu-masters.kudu.svc.cluster.local:7051,kudu-master-2.kudu-masters.kudu.svc.cluster.local:7051
     export IMPALA__impalacatalog__log_dir=/var/log/impala
     export IMPALA__impalacatalog__enable_legacy_avx_support=true
