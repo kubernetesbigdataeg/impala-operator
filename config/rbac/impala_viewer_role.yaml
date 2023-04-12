@@ -1,0 +1,27 @@
+# permissions for end users to view impalas.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: impala-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: impala-operator
+    app.kubernetes.io/part-of: impala-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: impala-viewer-role
+rules:
+- apiGroups:
+  - bigdata.kubernetesbigdataeg.org
+  resources:
+  - impalas
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - bigdata.kubernetesbigdataeg.org
+  resources:
+  - impalas/status
+  verbs:
+  - get
