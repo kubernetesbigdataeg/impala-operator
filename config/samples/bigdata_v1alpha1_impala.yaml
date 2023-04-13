@@ -1,0 +1,11 @@
+apiVersion: bigdata.kubernetesbigdataeg.org/v1alpha1
+kind: Impala
+metadata:
+  name: impala-sample
+spec:
+  # TODO(user): edit the following value to ensure the number 
+  # of Pods/Instances your Operand must have on cluster        
+  masterSize: 1
+  workerSize: 3
+
+  
